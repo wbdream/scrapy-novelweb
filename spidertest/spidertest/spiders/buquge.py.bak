@@ -1,0 +1,89 @@
+# -*- coding: utf-8 -*-
+import scrapy
+import requests
+from bs4 import BeautifulSoup
+import re
+from ..items import SpidertestItem
+from ..items import ChapterItem
+import time
+
+class BuqugeSpider(scrapy.Spider):
+    name = 'buquge'
+    allowed_domains = ['biquge5.com']
+    start_urls = ['http://www.biquge5.com/xiaoshuodaquan']
+
+    def parse(self, response):
+        # print(type(response.text))
+        # time.sleep(0.5)
+        # text=response.xpath('//div[@class="novellist"]/ul/li/a').extract()
+        # text=bs.find_all('li')
+        # text=re.findall('<a (.*?)>"(.*?)"<em>(.*?)</em>',response.text,re.S)
+        text=re.findall('<a href="(.*?)">(.*?) <em>(.*?)</em>',response.text)
+        # for i in text:
+        #     # print(type(i))
+        #     item = SpidertestItem()
+        #     item['href']='http://www.biquge5.com'+i[0]
+        #     item['name']=i[1]
+        #     item['author']=i[2]
+        #     # print(item['author'],item['name'],'******************')
+        #     yield item
+        # print(1111115556666622222222)
+        for i in text:
+            item = SpidertestItem()
+            item['href']='http://www.biquge5.com'+i[0]
+            item['name']=i[1]
+            item['author']=i[2]
+
+            # print(i[0]+"////////////************///////////////")
+            yield scrapy.Request(url='http://www.biquge5.com'+i[0],callback=self.parse_content)
+
+    def parse_content(self,response):
+        time.sleep(0.5)
+        # print(item)
+        name=response.xpath('//*[@id="info"]/h1/text()').extract_first()
+        jieshao=response.xpath('//*[@id="intro"]/p/text()')
+        text=re.findall('<ul class="_chapter">(.*?)</ul>',response.text,re.S)
+        # print(text,'-----------------')
+        chapters = re.findall('<a href="(.*?)\r\n\t\t\t(.*?)">(.*?)</a>', text[0],re.S)
+        # print(type(chapters),'***************////////////')
+        # print("/*/*/*/*/*/*/*/*/*/*/*/")
+        for item in chapters:
+            # print(item[0] + item[1], item[2], name, '/**/**/*/**/')
+            chapter=ChapterItem()
+            chapter['name']=name
+            chapter['href']=item[0]+item[1]
+            chapter['chapterName']=item[2]
+            yield chapter
+
+            # print(8888888888888888)
+            # print(item[0]+item[1],item[2],name,'/**/**/*/**/')
+        for item in chapters:
+            # print('@@@@@@@@@@@@@@@')
+            yield scrapy.Request(url=item[0]+item[1],callback=self.parse_chapterContent)
+
+    def parse_chapterContent(self,response):
+        # print(response.text)
+        time.sleep(0.5)
+        bs=BeautifulSoup(response.text,'lxml')
+        content = bs.select("#content")
+        # print(dir(response))
+        #章节内容
+        # print(content[0].get_text())
+        print(response.url,"------url")
+        print(type(response.url))
+        # url_first=re.findall('http://(.*?)/(.*?)/(.*?).html',response.url)
+        url_first=re.findall('http://(.*?).html',response.url)
+        # print(url_first[0])
+        urls=re.split('/',url_first[0])
+        # print(urls)
+        print('http://'+urls[0]+'/'+urls[1]+'/'+urls[2]+'.html')
+
+        url=re.findall('<a href="(.*?).html">下一章</a>',response.text)
+
+        if urls[2] in url[0]:
+            yield scrapy.Request(url='http://'+urls[0]+'/'+urls[1]+'/'+url[0]+'.html', callback=self.parse_chapterContent2)
+
+        # print(url)
+    def parse_chapterContent2(self,response):
+
+        print(response.text)
